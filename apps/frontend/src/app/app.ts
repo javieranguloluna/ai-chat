@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { Chat } from '@ai-sdk/angular';
-import { DefaultChatTransport } from 'ai';
+import { AppChatTransport } from './app-chat-transport';
 
 @Component({
   selector: 'app-root',
@@ -9,7 +9,7 @@ import { DefaultChatTransport } from 'ai';
 })
 export class App {
   readonly chat = new Chat({
-    transport: new DefaultChatTransport({ api: '/api/chat' }),
+    transport: new AppChatTransport({ api: '/api/chat' }),
   });
 
   protected input = '';
