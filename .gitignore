@@ -1,0 +1,22 @@
+# Nx
+.nx/cache
+.nx/workspace-data
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Builds
+dist/
+tmp/
+out-tsc/
+
+# Env
+.env
+.env.*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
