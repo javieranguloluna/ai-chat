@@ -1,109 +1,98 @@
-# New Nx Repository
+# AI Chat — Nx Monorepo Scaffold
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+Proyecto de **scaffolding**: un monorepo Nx con Angular + NestJS ya integrados y conectados, listo para empezar una app de chat (o cualquier otra) sin repetir el setup inicial.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+## Stack
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/docs/technologies/typescript/introduction?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+| Pieza         | Versión | Notas                                               |
+| ------------- | ------- | --------------------------------------------------- |
+| Nx            | 24.0.6  | Monorepo, cache y task pipeline                     |
+| Angular       | 22.2    | Frontend standalone + zoneless, SCSS                |
+| NestJS        | 11.2    | Backend con prefijo global `/api`                   |
+| TypeScript    | ~6.0.3  | Angular 22 exige `>=6.0 <6.1`; **no usar TS 7**     |
+| Vercel AI SDK | 7.0     | `ai` + `@ai-sdk/angular` (clase `Chat` con signals) |
+| NVIDIA NIM    | —       | Provider de modelos vía `@ai-sdk/openai-compatible` |
 
-🚀 If you haven't connected to Nx Cloud yet, [complete your setup here](https://cloud.nx.app/get-started). Get faster builds with remote caching, distributed task execution, and self-healing CI. [See how your workspace can benefit](#nx-cloud).
+Detalles del estudio de compatibilidad que dio forma al setup: [`docs/compatibilidad-monorepo.md`](docs/compatibilidad-monorepo.md).
 
-## Generate a library
+## Estructura
+
+```
+apps/
+  frontend/        Angular 22 (serve :4200, proxy /api → :3000)
+  backend/         NestJS 11 (serve :3000)
+backend-e2e/       Tests e2e del backend (requiere server en :3000)
+libs/
+  shared/models/   Tipos compartidos (@org/shared/models)
+docs/              Estudio de compatibilidad del stack
+```
+
+## Empezar
 
 ```sh
-npx nx g @nx/js:lib packages/pkg1 --publishable --importPath=@my-org/pkg1
+npm ci
+npm run dev          # levanta backend (:3000) y frontend (:4200) en paralelo
 ```
 
-## Run tasks
-
-To build the library use:
+Configuración del proveedor de modelos (el chat no funciona sin esto):
 
 ```sh
-npx nx run pkg1:build
+cp .env.example .env
+# editar .env y completar NIM_API_KEY (clave nvapi-... de https://build.nvidia.com)
 ```
 
-To run any task with Nx use:
+## Comandos útiles
 
 ```sh
-npx nx run <project-name>:<target>
+npx nx run-many -t build,lint,test --exclude=backend-e2e   # verificación completa
+npx nx graph                                               # grafo de dependencias
+npx nx g @nx/js:lib libs/mi-lib                            # nueva lib
+npx nx g @nx/angular:component apps/frontend/src/...       # componente Angular
 ```
 
-These targets are either [inferred automatically](https://nx.dev/docs/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+Al agregar paquetes al workspace, usar las herramientas del package manager (no `tsconfig` paths a mano).
 
-[More about running tasks in the docs &raquo;](https://nx.dev/docs/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Versioning and releasing
-
-To version and release the library use
+## Arquitectura del chat
 
 ```
-npx nx release
+Angular (Chat de @ai-sdk/angular, signals)
+   │  POST /api/chat — UI Messages (protocolo AI SDK) + Bearer token
+   ▼
+NestJS (streamText + @ai-sdk/openai-compatible)
+   │  OpenAI estándar
+   ▼
+NVIDIA NIM — https://integrate.api.nvidia.com/v1/chat/completions
 ```
 
-Pass `--dry-run` to see what would happen without actually releasing the library.
+- **Token**: `AuthService` (hardcoded de momento) → `AppChatTransport` lo inyecta en el header `authorization` de cada request; `DevAuthGuard` lo valida en el backend.
+- **Variables de inicio**: el componente pasar `userName`/`language` en el body; el backend las integra al system prompt.
+- **Nuevo chat**: reemplaza la instancia de `Chat` y arranca la conversación de cero.
+- **Streaming**: el backend framea el UI Message Stream a mano (Express no expone fetch `Response`); ver `apps/backend/src/app/chat/chat.controller.ts`.
 
-[Learn more about Nx release &raquo;](https://nx.dev/docs/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## Logs (en `logs/`, gitignored)
 
-## Keep TypeScript project references up to date
+Todos a archivo, nada a consola:
 
-Nx automatically updates TypeScript [project references](https://www.typescriptlang.org/docs/handbook/project-references.html) in `tsconfig.json` files to ensure they remain accurate based on your project dependencies (`import` or `require` statements). This sync is automatically done when running tasks such as `build` or `typecheck`, which require updated references to function correctly.
+| Archivo        | Contenido                                                                   |
+| -------------- | --------------------------------------------------------------------------- |
+| `context.log`  | Ventana de contexto completa enviada al provider (system prompt + mensajes) |
+| `backend.log`  | Cada request HTTP que procesa el backend (método, URL, status, duración)    |
+| `frontend.log` | Eventos del front: requests/responses del chat y acciones del usuario       |
 
-To manually trigger the process to sync the project graph dependencies information to the TypeScript project references, run the following command:
+El front acumula eventos en `LoggingService` y los envía a `POST /api/logs`; el backend los persiste.
 
-```sh
-npx nx sync
-```
+## Gotchas descubiertos
 
-You can enforce that the TypeScript project references are always in the correct state when running in CI by adding a step to your CI job configuration that runs the following command:
+- **TS setup clásico por aliases** (no project references): el generador `@nx/angular` no soporta project references. `tsconfig.base.json` sin `lib` explícita (DOM incluido por defecto), sin `composite`.
+- **`npm run dev` y locks de Nx**: si `nx serve backend` queda "Waiting for backend:serve:development in another nx process", matar el proceso que retiene el lock antes de relevar.
+- **npm 12 bloquea postinstalls** por defecto (aviso `install-scripts`).
+- **Modelos de NIM con EOL**: los modelos rotan; con clave inválida, 403 = modelo vivo, 410 = modelo muerto. Verificar el catálogo vigente en [docs de NIM](https://docs.api.nvidia.com/nim/reference/llm-apis).
+- **Autotraductor del navegador**: Google Translate corrompe el texto en streaming (mensajes que "aparecen y desaparecen"). `index.html` ya lleva `<meta name="google" content="notranslate" />` — no quitar.
+- **Generadores**: `@nx/nest:app` no soporta `--dry-run`.
 
-```sh
-npx nx sync:check
-```
+## Roadmap sugerido (scaffold → producto)
 
-[Learn more about nx sync](https://nx.dev/reference/nx-commands#sync)
-
-## Nx Cloud
-
-Nx Cloud ensures a [fast and scalable CI](https://nx.dev/nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
-
-- [Remote caching](https://nx.dev/docs/features/ci-features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/docs/features/ci-features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/docs/features/ci-features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/docs/features/ci-features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-### Set up CI (non-Github Actions CI)
-
-**Note:** This is only required if your CI provider is not GitHub Actions.
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
-```
-
-[Learn more about Nx on CI](https://nx.dev/docs/features/ci-features?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Install Nx Console
-
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
-
-[Install Nx Console &raquo;](https://nx.dev/docs/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## 🔗 Learn More
-
-- [Nx Documentation](https://nx.dev/docs)
-- [Crafting Your Workspace Tutorial](https://nx.dev/docs/getting-started/tutorials/crafting-your-workspace)
-- [Module Boundaries](https://nx.dev/docs/features/enforce-module-boundaries)
-- [Releasing Packages](https://nx.dev/docs/features/manage-releases)
-- [Nx Plugins](https://nx.dev/docs/concepts/nx-plugins)
-- [Nx Cloud](https://nx.dev/nx-cloud)
-
-## 💬 Community
-
-Join the Nx community:
-
-- [Discord](https://go.nx.dev/community)
-- [X (Twitter)](https://twitter.com/nxdevtools)
-- [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [YouTube](https://www.youtube.com/@nxdevtools)
-- [Blog](https://nx.dev/blog)
+- [ ] Reemplazar auth hardcoded por la real
+- [ ] Sesiones/persistencia de conversaciones
+- [ ] Selección de modelo y adjuntos (el backend ya habla OpenAI-compatible)
+- [ ] Reintroducir CI (con `gh auth refresh -s workflow` si se usa GitHub Actions)
