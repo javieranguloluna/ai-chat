@@ -44,6 +44,8 @@
   },
   "packageManager": "npm@12.2.2",
   "dependencies": {
+    "@ai-sdk/angular": "^3.0.173",
+    "@ai-sdk/openai-compatible": "^3.0.92",
     "@angular/common": "~22.2.0",
     "@angular/compiler": "~22.2.0",
     "@angular/core": "~22.2.0",
@@ -53,6 +55,7 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "ai": "^7.0.173",
     "axios": "^1.6.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0"

@@ -8,7 +8,14 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 
 async function bootstrap() {
+  // Carga variables de un .env en la raíz del workspace si existe (Node >= 20.12).
+  try {
+    process.loadEnvFile();
+  } catch {
+    // Sin .env: se usan solo las variables de entorno del proceso.
+  }
   const app = await NestFactory.create(AppModule);
+  app.enableCors();
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
   const port = process.env.PORT || 3000;

@@ -1,2 +1,27 @@
-<app-nx-welcome></app-nx-welcome>
-<router-outlet></router-outlet>
+<main class="chat">
+  <h1>AI Chat</h1>
+
+  <div class="messages">
+    @for (message of chat.messages; track message.id) {
+    <article [class.user]="message.role === 'user'">
+      @for (part of message.parts; track $index) { @if (part.type === 'text') {
+      <p>{{ part.text }}</p>
+      } }
+    </article>
+    } @if (chat.error) {
+    <p class="error">Ocurrió un error. Inténtalo de nuevo.</p>
+    }
+  </div>
+
+  <form (submit)="send($event)">
+    <textarea
+      [value]="input"
+      (input)="input = $any($event.target).value"
+      rows="2"
+      placeholder="Escribe un mensaje…"
+    ></textarea>
+    <button type="submit" [disabled]="chat.status !== 'ready' || !input.trim()">
+      {{ chat.status === 'ready' ? 'Enviar' : '…' }}
+    </button>
+  </form>
+</main>
