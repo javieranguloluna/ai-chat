@@ -12,6 +12,44 @@ h1 {
   margin: 0 0 1rem;
 }
 
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+
+  h1 {
+    margin: 0;
+  }
+
+  button {
+    padding: 0.35rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 0.5rem;
+    background: transparent;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.vars {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+
+  input {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #ccc;
+    border-radius: 0.5rem;
+    font: inherit;
+  }
+}
+
 .messages {
   flex: 1;
   overflow-y: auto;

@@ -1,14 +1,38 @@
 <main class="chat">
-  <h1>AI Chat</h1>
+  <header>
+    <h1>AI Chat</h1>
+    <button
+      type="button"
+      (click)="nuevoChat()"
+      [disabled]="
+        chat().status === 'submitted' || chat().status === 'streaming'
+      "
+    >
+      Nuevo chat
+    </button>
+  </header>
+
+  <div class="vars">
+    <input
+      placeholder="Tu nombre"
+      [value]="chatVariables.userName"
+      (input)="chatVariables.userName = $any($event.target).value"
+    />
+    <input
+      placeholder="Idioma de respuesta"
+      [value]="chatVariables.language"
+      (input)="chatVariables.language = $any($event.target).value"
+    />
+  </div>
 
   <div class="messages">
-    @for (message of chat.messages; track message.id) {
+    @for (message of chat().messages; track message.id) {
     <article [class.user]="message.role === 'user'">
       @for (part of message.parts; track $index) { @if (part.type === 'text') {
       <p>{{ part.text }}</p>
       } }
     </article>
-    } @if (chat.error) {
+    } @if (chat().error) {
     <p class="error">Ocurrió un error. Inténtalo de nuevo.</p>
     }
   </div>
@@ -20,8 +44,11 @@
       rows="2"
       placeholder="Escribe un mensaje…"
     ></textarea>
-    <button type="submit" [disabled]="chat.status !== 'ready' || !input.trim()">
-      {{ chat.status === 'ready' ? 'Enviar' : '…' }}
+    <button
+      type="submit"
+      [disabled]="chat().status !== 'ready' || !input.trim()"
+    >
+      {{ chat().status === 'ready' ? 'Enviar' : '…' }}
     </button>
   </form>
 </main>
