@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   InternalServerErrorException,
+  Logger,
   Post,
   Req,
   Res,
@@ -34,6 +35,8 @@ type ChatRequestBody = {
 
 @Controller('chat')
 export class ChatController {
+  private readonly logger = new Logger('ChatContext');
+
   @Post()
   async chat(
     @Req() req: Request,
@@ -77,10 +80,26 @@ ${contexto}`
       apiKey,
     });
 
+    const modelMessages = await convertToModelMessages(messages);
+
+    // Log de la ventana de contexto completa que se envía al provider
+    // (system prompt + todo el historial convertido a ModelMessage).
+    this.logger.log(
+      `Contexto enviado al provider (${modelMessages.length} mensajes):\n${JSON.stringify(
+        {
+          model: process.env.NIM_MODEL ?? DEFAULT_NIM_MODEL,
+          system: systemPrompt,
+          messages: modelMessages,
+        },
+        null,
+        2,
+      )}`,
+    );
+
     const result = streamText({
       model: nim(process.env.NIM_MODEL ?? DEFAULT_NIM_MODEL),
       system: systemPrompt,
-      messages: await convertToModelMessages(messages),
+      messages: modelMessages,
     });
 
     res.setHeader('content-type', 'text/event-stream');
