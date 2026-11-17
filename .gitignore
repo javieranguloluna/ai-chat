@@ -56,3 +56,6 @@ Thumbs.db
 .angular
 
 __screenshots__/
+
+# Logs locales
+logs

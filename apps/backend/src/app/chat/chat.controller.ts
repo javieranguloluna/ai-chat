@@ -3,13 +3,11 @@ import {
   Body,
   Controller,
   InternalServerErrorException,
-  Logger,
   Post,
-  Req,
   Res,
-  UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import {
   convertToModelMessages,
   streamText,
@@ -17,15 +15,13 @@ import {
   type UIMessage,
 } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { DevAuthGuard } from '../auth/dev-auth.guard';
+import { FileLogService } from '../log/file-log.service';
 
 const DEFAULT_NIM_BASE_URL = 'https://integrate.api.nvidia.com/v1';
 const DEFAULT_NIM_MODEL = 'openai/gpt-oss-20b';
 const DEFAULT_SYSTEM_PROMPT =
   'Eres un asistente útil. Responde de forma clara y concisa.';
-
-// Autenticación hardcoded de momento. Debe coincidir con el token que envía
-// el frontend en el header `Authorization: Bearer <token>`.
-const DEV_AUTH_TOKEN = 'dev-token-123';
 
 type ChatRequestBody = {
   messages?: UIMessage[];
@@ -34,19 +30,15 @@ type ChatRequestBody = {
 };
 
 @Controller('chat')
+@UseGuards(DevAuthGuard)
 export class ChatController {
-  private readonly logger = new Logger('ChatContext');
+  constructor(private readonly fileLog: FileLogService) {}
 
   @Post()
   async chat(
-    @Req() req: Request,
     @Body() body: ChatRequestBody,
     @Res() res: Response,
   ): Promise<void> {
-    if (req.headers[`authorization`] !== `Bearer ${DEV_AUTH_TOKEN}`) {
-      throw new UnauthorizedException('Token inválido o ausente.');
-    }
-
     const { messages } = body ?? {};
     if (!Array.isArray(messages)) {
       throw new BadRequestException('Se requiere un array de "messages".');
@@ -82,10 +74,11 @@ ${contexto}`
 
     const modelMessages = await convertToModelMessages(messages);
 
-    // Log de la ventana de contexto completa que se envía al provider
+    // Log de la ventana de contexto completa hacia el provider a archivo
     // (system prompt + todo el historial convertido a ModelMessage).
-    this.logger.log(
-      `Contexto enviado al provider (${modelMessages.length} mensajes):\n${JSON.stringify(
+    this.fileLog.write(
+      'context.log',
+      `=== ${new Date().toISOString()} ===\n${JSON.stringify(
         {
           model: process.env.NIM_MODEL ?? DEFAULT_NIM_MODEL,
           system: systemPrompt,
